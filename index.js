@@ -16,6 +16,8 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({server});
 
+let watchPaths = [];
+
 app.use(express.static(`${__dirname}/viewer`));
 
 app.get(`/model.jscad`, (req, res) => {
@@ -35,7 +37,11 @@ function includeify(script) {
                 p.node.expression.callee &&
                 p.node.expression.callee.name === 'include'
             ) {
-                const file = fs.readFileSync(`${path.dirname(process.argv[2])}/${p.node.expression.arguments[0].value}`, `utf8`);
+                const filePath = `${path.dirname(process.argv[2])}/${p.node.expression.arguments[0].value}`;
+
+                watchPaths.push(filePath)
+
+                const file = fs.readFileSync(filePath, `utf8`);
                 const includeAst = recast.parse(file);
 
                 p.replace(...includeAst.program.body);
@@ -54,16 +60,23 @@ fs.access(process.argv[2], fs.constants.R_OK, (err) => {
         return;
     }
 
-    chokidar.watch(process.argv[2], {
+    const watcher = chokidar.watch(process.argv[2], {
         ignoreInitial: true
     }).on(`all`, () => {
+        watcher.unwatch(watchPaths);
+
+        watchPaths = [];
+
         fs.readFile(process.argv[2], `utf8`, (err, file) => {
-            file = includeify(file)
+            file = includeify(file);
+
             wss.clients.forEach((client) => {
                 if (client.readyState === WebSocket.OPEN) {
                   client.send(file);
                 }
-            })
+            });
+
+            watcher.add(watchPaths);
         });
     });
 
