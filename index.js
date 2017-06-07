@@ -9,6 +9,7 @@ const path = require(`path`);
 const recast = require(`recast`);
 const chokidar = require(`chokidar`);
 const WebSocket = require('ws');
+const opn = require('opn');
 
 const app = express();
 
@@ -67,6 +68,6 @@ fs.access(process.argv[2], fs.constants.R_OK, (err) => {
     });
 
     server.listen(3000, function () {
-        console.log('Example app listening on port 3000!')
+        opn(`http://localhost:3000`);
     })
 });
